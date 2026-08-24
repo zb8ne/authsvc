@@ -1,4 +1,22 @@
 services:
+  authsvc:
+    build: .
+    depends_on:
+      db: {condition: service_healthy}
+    environment:
+      PORT: "8080"
+      DEV: "1"
+      ISSUER: http://localhost:8080
+      DATABASE_URL: postgres://authsvc:authsvc@db:5432/authsvc?sslmode=disable
+      # Dev-only key. Generate a real one per environment; see README.
+      ED25519_PRIVATE_KEY: "${ED25519_PRIVATE_KEY:-3q2+796tvu/erb7v3q2+796tvu/erb7v3q2+796tvu8=}"
+      ADMIN_API_KEY: "${ADMIN_API_KEY:-dev-admin-key}"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      GITHUB_CLIENT_ID: "${GITHUB_CLIENT_ID:-}"
+      GITHUB_CLIENT_SECRET: "${GITHUB_CLIENT_SECRET:-}"
+    ports: ["8080:8080"]
+
   db:
     image: postgres:16-alpine
     environment:

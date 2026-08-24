@@ -1,0 +1,8 @@
+/authsvc
+*.env
+.env*
+/tmp/
+CLAUDE.md
+.claude/
+AGENTS.md
+*.scratch.*

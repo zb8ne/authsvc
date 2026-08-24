@@ -3,6 +3,7 @@ package store
 
 import (
 	"context"
+	"crypto/subtle"
 	"embed"
 	"errors"
 	"time"
@@ -44,6 +45,10 @@ func (db *DB) Close() { db.Pool.Close() }
 func (db *DB) Health(ctx context.Context) error {
 	var one int
 	return db.Pool.QueryRow(ctx, "SELECT 1").Scan(&one)
+}
+
+func constantTimeEqual(a, b []byte) bool {
+	return subtle.ConstantTimeCompare(a, b) == 1
 }
 
 func norows(err error) error {

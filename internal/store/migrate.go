@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/pressly/goose/v3"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/pressly/goose/v3"
 )
 
 // Migrate applies all pending migrations. In production this runs as a release

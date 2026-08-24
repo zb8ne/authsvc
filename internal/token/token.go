@@ -128,6 +128,9 @@ func addPublic(set jwk.Set, priv jwk.Key) error {
 
 // JWKS returns the public key set. Both the current and the next key are always
 // present so a rotation is a config change, not a flag day.
+// AccessTTL is the lifetime of tokens this signer mints.
+func (s *Signer) AccessTTL() time.Duration { return s.ttl }
+
 func (s *Signer) JWKS() (jwk.Set, error) { return s.pubSet, nil }
 
 func (s *Signer) SignAccess(c Claims) (string, error) {
@@ -198,6 +201,10 @@ func (s *Signer) VerifyAccess(raw, audience string) (*Claims, error) {
 	}
 	if v, ok := tok.Get("roles"); ok {
 		if list, ok := v.([]any); ok {
+			// Start non-nil so a token with no roles round-trips as an empty
+			// slice rather than nil; callers range over it either way, but the
+			// asymmetry is a trap worth not having.
+			c.Roles = make([]string, 0, len(list))
 			for _, r := range list {
 				if s, ok := r.(string); ok {
 					c.Roles = append(c.Roles, s)
@@ -226,4 +233,19 @@ func NewRefreshToken() (string, error) {
 func HashRefresh(tok string) []byte {
 	sum := sha256.Sum256([]byte(tok))
 	return sum[:]
+}
+
+// PeekAudience reads the audience from an *unverified* token so the caller can
+// then verify against it. The returned value is attacker-controlled until
+// VerifyAccess succeeds — never trust it for anything else.
+func PeekAudience(raw string) (string, error) {
+	tok, err := jwt.ParseInsecure([]byte(raw))
+	if err != nil {
+		return "", err
+	}
+	aud := tok.Audience()
+	if len(aud) == 0 {
+		return "", errors.New("token: no audience")
+	}
+	return aud[0], nil
 }

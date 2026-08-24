@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: authsvc
+      POSTGRES_PASSWORD: authsvc
+      POSTGRES_DB: authsvc
+    ports: ["5434:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authsvc"]
+      interval: 2s
+      retries: 15
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+volumes:
+  pgdata:

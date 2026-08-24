@@ -201,3 +201,18 @@ func TestHashRefreshIsStableSHA256(t *testing.T) {
 		t.Fatal("distinct tokens hash equal")
 	}
 }
+
+func TestEmptyRolesRoundTripsAsEmptySlice(t *testing.T) {
+	s := newSigner(t)
+	tok, _ := s.SignAccess(Claims{Subject: "u1", Audience: "dayflow"})
+	got, err := s.VerifyAccess(tok, "dayflow")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Roles == nil {
+		t.Fatal("roles came back nil; signing an empty slice must verify as an empty slice")
+	}
+	if len(got.Roles) != 0 {
+		t.Fatalf("roles = %v, want empty", got.Roles)
+	}
+}

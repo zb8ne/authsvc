@@ -100,3 +100,22 @@ func (c *Client) AllowsRedirect(uri string) bool {
 	}
 	return false
 }
+
+func (db *DB) ListClients(ctx context.Context) ([]Client, error) {
+	rows, err := db.Pool.Query(ctx,
+		`SELECT id, name, secret_hash, redirect_uris, audience FROM app_clients ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []Client
+	for rows.Next() {
+		var c Client
+		if err := rows.Scan(&c.ID, &c.Name, &c.SecretHash, &c.RedirectURIs, &c.Audience); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}

@@ -15,8 +15,8 @@ import (
 )
 
 type Config struct {
-	Port      string
-	Issuer    string
+	Port        string
+	Issuer      string
 	DatabaseURL string
 
 	SigningKey     string

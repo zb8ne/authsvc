@@ -41,7 +41,7 @@ func TestVerifyRejectsMalformed(t *testing.T) {
 		"notahash",
 		"$argon2id$v=19$m=65536,t=3,p=2$onlyfourparts",
 		"$argon2i$v=19$m=65536,t=3,p=2$c2FsdHNhbHQ$aGFzaGhhc2g",  // wrong variant
-		"$argon2id$v=13$m=65536,t=3,p=2$c2FsdHNhbHQ$aGFzaGhhc2g",  // wrong version
+		"$argon2id$v=13$m=65536,t=3,p=2$c2FsdHNhbHQ$aGFzaGhhc2g", // wrong version
 		"$argon2id$v=19$m=bad,t=3,p=2$c2FsdHNhbHQ$aGFzaGhhc2g",
 		"$argon2id$v=19$m=65536,t=3,p=2$!!!notb64$aGFzaGhhc2g",
 	}

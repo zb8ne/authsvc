@@ -69,6 +69,7 @@ type rig struct {
 	db     *store.DB
 	mail   *capture
 	signer *token.Signer
+	server *Server
 	// ip is unique per rig. Rate limits are keyed on the client IP, so without
 	// this every test would share one budget and later tests would 429.
 	ip string
@@ -107,7 +108,7 @@ func newRig(t *testing.T) *rig {
 	srv := httptest.NewServer(s.Routes())
 	t.Cleanup(srv.Close)
 
-	return &rig{t: t, srv: srv, db: db, mail: mail, signer: signer, ip: uniqueIP()}
+	return &rig{t: t, srv: srv, db: db, mail: mail, signer: signer, server: s, ip: uniqueIP()}
 }
 
 // newClient registers an app client directly in the DB.

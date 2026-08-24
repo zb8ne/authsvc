@@ -65,10 +65,10 @@ func TestAdminRequiresKey(t *testing.T) {
 func TestCreateClientValidatesRedirectURIs(t *testing.T) {
 	r := newRig(t)
 	bad := []string{
-		"http://evil.test/cb",          // plaintext, not localhost
-		"/relative/cb",                 // not absolute
-		"https://app.test/cb#frag",     // fragment
-		"https://*.app.test/cb",        // wildcard
+		"http://evil.test/cb",      // plaintext, not localhost
+		"/relative/cb",             // not absolute
+		"https://app.test/cb#frag", // fragment
+		"https://*.app.test/cb",    // wildcard
 		"::::not a url",
 	}
 	for _, uri := range bad {

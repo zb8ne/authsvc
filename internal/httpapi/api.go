@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/yash-sharma-dev/authsvc/internal/notify"
+	"github.com/yash-sharma-dev/authsvc/internal/oauth"
 	"github.com/yash-sharma-dev/authsvc/internal/store"
 	"github.com/yash-sharma-dev/authsvc/internal/token"
 )
@@ -40,13 +41,25 @@ type Server struct {
 	log    *slog.Logger
 	opts   Options
 	now    func() time.Time
+	// providers is keyed by provider name; a provider absent from the map is
+	// simply not configured, and its routes 404.
+	providers map[string]oauth.Provider
+}
+
+// WithProviders registers the configured OAuth providers.
+func (s *Server) WithProviders(ps ...oauth.Provider) *Server {
+	for _, p := range ps {
+		s.providers[p.Name()] = p
+	}
+	return s
 }
 
 func New(db *store.DB, signer *token.Signer, sender notify.Sender, log *slog.Logger, opts Options) *Server {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Server{db: db, signer: signer, sender: sender, log: log, opts: opts, now: time.Now}
+	return &Server{db: db, signer: signer, sender: sender, log: log, opts: opts,
+		now: time.Now, providers: map[string]oauth.Provider{}}
 }
 
 func (s *Server) Routes() http.Handler {
@@ -64,6 +77,11 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /v1/auth/otp/request", s.handleOTPRequest)
 	mux.HandleFunc("POST /v1/auth/otp/verify", s.handleOTPVerify)
 
+	mux.HandleFunc("GET /v1/oauth/{provider}/start", s.handleOAuthStart)
+	mux.HandleFunc("GET /v1/oauth/{provider}/callback", s.handleOAuthCallback)
+	mux.HandleFunc("GET /v1/me/link/{provider}/start", s.requireUser(s.handleLinkStart))
+
+	mux.HandleFunc("POST /v1/token/exchange", s.handleTokenExchange)
 	mux.HandleFunc("POST /v1/token/refresh", s.handleRefresh)
 	mux.HandleFunc("POST /v1/auth/logout", s.requireUser(s.handleLogout))
 	mux.HandleFunc("POST /v1/auth/logout-all", s.requireUser(s.handleLogoutAll))

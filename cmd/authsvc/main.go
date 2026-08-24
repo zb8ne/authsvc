@@ -14,6 +14,7 @@ import (
 	"github.com/yash-sharma-dev/authsvc/internal/config"
 	"github.com/yash-sharma-dev/authsvc/internal/httpapi"
 	"github.com/yash-sharma-dev/authsvc/internal/notify"
+	"github.com/yash-sharma-dev/authsvc/internal/oauth"
 	"github.com/yash-sharma-dev/authsvc/internal/store"
 	"github.com/yash-sharma-dev/authsvc/internal/token"
 )
@@ -75,7 +76,7 @@ func run(log *slog.Logger, migrateOnly bool) error {
 		Issuer:      cfg.Issuer,
 		AdminAPIKey: cfg.AdminAPIKey,
 		Secure:      !cfg.Dev,
-	})
+	}).WithProviders(providers(cfg, log)...)
 
 	go prune(ctx, db, log)
 
@@ -105,6 +106,25 @@ func run(log *slog.Logger, migrateOnly bool) error {
 		defer cancel()
 		return h.Shutdown(shutCtx)
 	}
+}
+
+// providers wires only the OAuth apps that are actually configured. The one
+// callback URL below is what gets registered with Google and GitHub, once.
+func providers(cfg *config.Config, log *slog.Logger) []oauth.Provider {
+	var out []oauth.Provider
+	if cfg.Google.Configured() {
+		out = append(out, oauth.NewGoogle(cfg.Google.ClientID, cfg.Google.ClientSecret,
+			cfg.Issuer+"/v1/oauth/google/callback"))
+	} else {
+		log.Warn("google oauth not configured; /v1/oauth/google/* will 404")
+	}
+	if cfg.GitHub.Configured() {
+		out = append(out, oauth.NewGitHub(cfg.GitHub.ClientID, cfg.GitHub.ClientSecret,
+			cfg.Issuer+"/v1/oauth/github/callback"))
+	} else {
+		log.Warn("github oauth not configured; /v1/oauth/github/* will 404")
+	}
+	return out
 }
 
 func buildSender(cfg *config.Config, log *slog.Logger) (notify.Sender, error) {
@@ -142,6 +162,9 @@ func prune(ctx context.Context, db *store.DB, log *slog.Logger) {
 			}
 			if _, err := db.PruneRateLimits(ctx, 24*time.Hour); err != nil {
 				log.Error("prune rate limits", "err", err)
+			}
+			if err := db.PruneOAuth(ctx); err != nil {
+				log.Error("prune oauth", "err", err)
 			}
 		}
 	}

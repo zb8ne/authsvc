@@ -8,9 +8,11 @@ require (
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/pressly/goose/v3 v3.27.3
 	golang.org/x/crypto v0.55.0
+	golang.org/x/oauth2 v0.36.0
 )
 
 require (
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
 	github.com/goccy/go-json v0.10.6 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect

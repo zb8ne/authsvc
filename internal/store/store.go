@@ -39,6 +39,10 @@ func Open(ctx context.Context, dsn string) (*DB, error) {
 	return &DB{Pool: pool, now: time.Now}, nil
 }
 
+// SetNow overrides the clock. Tests only — it exists so time-dependent
+// behaviour (expiry, rate-limit windows) can be exercised without sleeping.
+func (db *DB) SetNow(f func() time.Time) { db.now = f }
+
 func (db *DB) Close() { db.Pool.Close() }
 
 // Health verifies actual DB connectivity, not just process liveness.

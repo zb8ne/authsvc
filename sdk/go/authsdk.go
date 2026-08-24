@@ -37,11 +37,21 @@ type Config struct {
 	// Defaults to 15 minutes; keys are served from cache regardless.
 	JWKSRefresh time.Duration
 	// JWKSMaxStale bounds how long a cached key set may be served after
-	// refreshes start failing. Zero means forever, which is the right default:
-	// a stale key set still verifies correctly, and expiring it would convert
-	// an authsvc outage into an outage for every app. Set it only if you have
-	// a concrete key-compromise policy that requires it.
+	// refreshes start failing. Defaults to DefaultJWKSMaxStale.
+	//
+	// This is the bound on how long a compromised signing key stays trusted by
+	// an app that can no longer reach authsvc. It has to be finite: without it,
+	// rotating a leaked key out would mean redeploying every dependent app.
+	// Seven days is long enough that an outage serves stale keys and nothing
+	// breaks, and short enough that the blast radius is bounded.
+	//
+	// Set to NoMaxStale to disable expiry entirely. Only do that if you would
+	// rather serve indefinitely-old keys than fail closed.
 	JWKSMaxStale time.Duration
+
+	// SignInURL is your app's own sign-in page. The default callback error page
+	// links to it as the way forward. Optional.
+	SignInURL string
 
 	// OnError receives background refresh failures. Optional.
 	OnError func(error)
@@ -55,7 +65,20 @@ type Client struct {
 	once sync.Once
 }
 
+// DefaultJWKSMaxStale bounds how long cached keys are trusted once refreshes
+// start failing. A 7-day authsvc outage is a different conversation than a
+// key-rotation policy.
+const DefaultJWKSMaxStale = 7 * 24 * time.Hour
+
+// NoMaxStale disables key expiry. See Config.JWKSMaxStale before using it.
+const NoMaxStale = time.Duration(-1)
+
 var ErrNoBaseURL = errors.New("authsdk: BaseURL is required")
+
+// ErrKeysTooStale means refreshes have been failing for longer than
+// JWKSMaxStale. The SDK fails closed rather than trust keys it can no longer
+// confirm.
+var ErrKeysTooStale = errors.New("authsdk: cached keys are too stale to trust")
 
 func New(cfg Config) (*Client, error) {
 	if cfg.BaseURL == "" {
@@ -74,6 +97,9 @@ func New(cfg Config) (*Client, error) {
 	}
 	if cfg.JWKSRefresh <= 0 {
 		cfg.JWKSRefresh = 15 * time.Minute
+	}
+	if cfg.JWKSMaxStale == 0 {
+		cfg.JWKSMaxStale = DefaultJWKSMaxStale
 	}
 
 	c := &Client{cfg: cfg, http: cfg.HTTPClient, stop: make(chan struct{})}

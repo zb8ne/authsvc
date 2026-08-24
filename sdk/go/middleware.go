@@ -55,7 +55,7 @@ func (c *Client) RequireUser(next http.Handler) http.Handler {
 		if err != nil {
 			// A missing key set is the service's problem, not the caller's;
 			// saying 401 would tell the user to re-login pointlessly.
-			if errorIsNoKeys(err) {
+			if errorIsKeyProblem(err) {
 				writeAuthErr(w, http.StatusServiceUnavailable, "keys_unavailable",
 					"cannot verify tokens right now")
 				return

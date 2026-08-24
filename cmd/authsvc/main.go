@@ -141,31 +141,50 @@ func buildSender(cfg *config.Config, log *slog.Logger) (notify.Sender, error) {
 	return nil, errors.New("SMTP_HOST and SMTP_FROM are required outside DEV")
 }
 
-// prune keeps the two tables that grow from accumulating dead rows.
+// prune keeps the tables that grow from accumulating dead rows. sessions is the
+// only one that grows with traffic rather than users — one row per refresh — so
+// this is what stands between the service and unbounded storage growth.
+//
+// It runs once at startup and then on a ticker. The startup run matters: a
+// platform that redeploys more often than the tick interval would otherwise
+// never prune at all.
 func prune(ctx context.Context, db *store.DB, log *slog.Logger) {
-	t := time.NewTicker(6 * time.Hour)
+	pruneOnce(ctx, db, log)
+
+	t := time.NewTicker(pruneInterval)
 	defer t.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			if n, err := db.PruneSessions(ctx, 30*24*time.Hour); err != nil {
-				log.Error("prune sessions", "err", err)
-			} else if n > 0 {
-				log.Info("pruned sessions", "rows", n)
-			}
-			if n, err := db.PruneCodes(ctx, 24*time.Hour); err != nil {
-				log.Error("prune codes", "err", err)
-			} else if n > 0 {
-				log.Info("pruned codes", "rows", n)
-			}
-			if _, err := db.PruneRateLimits(ctx, 24*time.Hour); err != nil {
-				log.Error("prune rate limits", "err", err)
-			}
-			if err := db.PruneOAuth(ctx); err != nil {
-				log.Error("prune oauth", "err", err)
-			}
+			pruneOnce(ctx, db, log)
 		}
+	}
+}
+
+const (
+	pruneInterval = 6 * time.Hour
+	// sessionGrace keeps expired sessions around briefly for auditing before
+	// they are deleted.
+	sessionGrace = 30 * 24 * time.Hour
+)
+
+func pruneOnce(ctx context.Context, db *store.DB, log *slog.Logger) {
+	if n, err := db.PruneSessions(ctx, sessionGrace); err != nil {
+		log.Error("prune sessions", "err", err)
+	} else if n > 0 {
+		log.Info("pruned sessions", "rows", n)
+	}
+	if n, err := db.PruneCodes(ctx, 24*time.Hour); err != nil {
+		log.Error("prune codes", "err", err)
+	} else if n > 0 {
+		log.Info("pruned codes", "rows", n)
+	}
+	if _, err := db.PruneRateLimits(ctx, 24*time.Hour); err != nil {
+		log.Error("prune rate limits", "err", err)
+	}
+	if err := db.PruneOAuth(ctx); err != nil {
+		log.Error("prune oauth", "err", err)
 	}
 }

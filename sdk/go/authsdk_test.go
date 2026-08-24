@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -451,8 +452,65 @@ func TestJWKSMaxStaleRejectsAncientKeys(t *testing.T) {
 	f.srv.Close()
 	time.Sleep(5 * time.Millisecond)
 
-	if _, err := c.Verify(tok); err == nil {
+	_, err := c.Verify(tok)
+	if err == nil {
 		t.Fatal("keys past JWKSMaxStale were still used")
+	}
+	if !errors.Is(err, ErrKeysTooStale) {
+		t.Fatalf("err = %v, want ErrKeysTooStale", err)
+	}
+}
+
+// The bound on how long a compromised signing key stays trusted by an app that
+// can no longer reach authsvc. It must be finite by default.
+func TestJWKSMaxStaleDefaultsToAFiniteBound(t *testing.T) {
+	f := newFakeAuthsvc(t)
+	c := newTestClient(t, f, func(cfg *Config) { cfg.JWKSMaxStale = 0 })
+
+	if c.cfg.JWKSMaxStale <= 0 {
+		t.Fatal("JWKSMaxStale defaulted to unbounded; a leaked key would stay trusted forever")
+	}
+	if c.cfg.JWKSMaxStale != DefaultJWKSMaxStale {
+		t.Fatalf("JWKSMaxStale = %v, want %v", c.cfg.JWKSMaxStale, DefaultJWKSMaxStale)
+	}
+	// Long enough that an ordinary outage does not break anything.
+	if c.cfg.JWKSMaxStale < 24*time.Hour {
+		t.Fatalf("JWKSMaxStale = %v, too short to ride out an outage", c.cfg.JWKSMaxStale)
+	}
+}
+
+func TestNoMaxStaleDisablesExpiry(t *testing.T) {
+	f := newFakeAuthsvc(t)
+	c := newTestClient(t, f, func(cfg *Config) { cfg.JWKSMaxStale = NoMaxStale })
+	tok := f.mint(t)
+
+	f.srv.Close()
+	time.Sleep(5 * time.Millisecond)
+
+	if _, err := c.Verify(tok); err != nil {
+		t.Fatalf("NoMaxStale still expired the keys: %v", err)
+	}
+}
+
+// Stale keys are the service's problem, not the caller's — same as a cold cache.
+func TestStaleKeysReport503NotUnauthorized(t *testing.T) {
+	f := newFakeAuthsvc(t)
+	c := newTestClient(t, f, func(cfg *Config) { cfg.JWKSMaxStale = time.Millisecond })
+	tok := f.mint(t)
+
+	f.srv.Close()
+	time.Sleep(5 * time.Millisecond)
+
+	h := c.RequireUser(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler ran with untrustworthy keys")
+	}))
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status %d, want 503", rec.Code)
 	}
 }
 

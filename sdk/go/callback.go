@@ -10,8 +10,9 @@ import (
 // why the code exchange exists.
 type SessionHandler func(w http.ResponseWriter, r *http.Request, s *Session)
 
-// ErrorHandler receives a failed callback. If nil, a plain 401 is written.
-type ErrorHandler func(w http.ResponseWriter, r *http.Request, code string, err error)
+// ErrorHandler receives a failed callback. code is one of the CallbackError
+// constants. If nil, a human-readable page is rendered — see WriteErrorPage.
+type ErrorHandler func(w http.ResponseWriter, r *http.Request, code CallbackError, err error)
 
 // HandleCallback returns the handler for your app's registered redirect_uri.
 // It exchanges the one-time code server-side and hands you the session.
@@ -21,8 +22,11 @@ func (c *Client) HandleCallback(onSession SessionHandler) http.Handler {
 
 func (c *Client) HandleCallbackWithError(onSession SessionHandler, onError ErrorHandler) http.Handler {
 	if onError == nil {
-		onError = func(w http.ResponseWriter, r *http.Request, code string, err error) {
-			writeAuthErr(w, http.StatusUnauthorized, code, "sign-in failed")
+		// A bare error code is a dead end for the person who hit it, and
+		// manual_link_required is a path real users take: registered with a
+		// password, later clicked "Sign in with Google".
+		onError = func(w http.ResponseWriter, r *http.Request, code CallbackError, err error) {
+			WriteErrorPage(w, http.StatusUnauthorized, code, c.cfg.SignInURL)
 		}
 	}
 
@@ -33,18 +37,18 @@ func (c *Client) HandleCallbackWithError(onSession SessionHandler, onError Error
 		// including manual_link_required when an unsafe account link was
 		// declined. Surface that to the user rather than retrying the login.
 		if e := q.Get("error"); e != "" {
-			onError(w, r, e, nil)
+			onError(w, r, CallbackError(e), nil)
 			return
 		}
 		code := q.Get("code")
 		if code == "" {
-			onError(w, r, "missing_code", nil)
+			onError(w, r, ErrCodeMissingCode, nil)
 			return
 		}
 
 		s, err := c.Exchange(r.Context(), code)
 		if err != nil {
-			onError(w, r, "exchange_failed", err)
+			onError(w, r, ErrCodeExchangeFailed, err)
 			return
 		}
 		onSession(w, r, s)

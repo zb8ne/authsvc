@@ -55,6 +55,9 @@ type env struct {
 	clientID string
 	secret   string
 	prov     *stubProvider
+	// ip is this env's source address; see uniqueIP.
+	ip     string
+	client *http.Client
 }
 
 func setup(t *testing.T) *env {
@@ -105,12 +108,15 @@ func setup(t *testing.T) *env {
 	srv.Start()
 	t.Cleanup(srv.Close)
 
+	ip := uniqueIP()
+	client := newIPClient(ip)
+
 	// Register the app the way an operator would: one admin call, no console.
 	clientID := "e2e-" + strings.ToLower(ulid.Make().String())
 	body := `{"id":"` + clientID + `","name":"E2E","redirect_uris":["https://app.test/cb"]}`
 	req, _ := http.NewRequest("POST", srv.URL+"/v1/admin/clients", strings.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+adminKey)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,13 +133,15 @@ func setup(t *testing.T) *env {
 		ClientSecret: secret,
 		Audience:     clientID,
 		Issuer:       issuer,
+		HTTPClient:   client,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(sdk.Close)
 
-	return &env{auth: srv, db: db, sdk: sdk, clientID: clientID, secret: secret, prov: prov}
+	return &env{auth: srv, db: db, sdk: sdk, clientID: clientID, secret: secret,
+		prov: prov, ip: ip, client: client}
 }
 
 func jsonField(t *testing.T, raw []byte, key string) string {
@@ -164,33 +172,18 @@ func (e *env) protectedApp() *httptest.Server {
 	return httptest.NewServer(mux)
 }
 
-func get(t *testing.T, url, bearer string) (int, string) {
-	t.Helper()
-	req, _ := http.NewRequest("GET", url, nil)
-	if bearer != "" {
-		req.Header.Set("Authorization", "Bearer "+bearer)
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-	b, _ := io.ReadAll(resp.Body)
-	return resp.StatusCode, string(b)
-}
-
 func TestSDKVerifiesRealServerTokens(t *testing.T) {
 	e := setup(t)
 	app := e.protectedApp()
 	defer app.Close()
 
 	email := "user-" + strings.ToLower(ulid.Make().String()) + "@example.test"
-	reg := postJSON(t, e.auth.URL+"/v1/auth/register", map[string]string{
+	reg := e.postJSON(t, e.auth.URL+"/v1/auth/register", map[string]string{
 		"client_id": e.clientID, "email": email, "password": "a-good-long-password",
 	})
 	access := jsonField(t, reg, "access_token")
 
-	status, body := get(t, app.URL+"/whoami", access)
+	status, body := e.get(t, app.URL+"/whoami", access)
 	if status != http.StatusOK {
 		t.Fatalf("protected route rejected a real token: %d %s", status, body)
 	}
@@ -199,7 +192,7 @@ func TestSDKVerifiesRealServerTokens(t *testing.T) {
 	}
 
 	// No roles on the token, so the admin route must refuse.
-	if status, _ := get(t, app.URL+"/admin", access); status != http.StatusForbidden {
+	if status, _ := e.get(t, app.URL+"/admin", access); status != http.StatusForbidden {
 		t.Fatalf("admin route returned %d for a roleless token, want 403", status)
 	}
 }
@@ -210,11 +203,11 @@ func TestSDKRejectsAnotherClientsToken(t *testing.T) {
 	defer app.Close()
 
 	email := "user-" + strings.ToLower(ulid.Make().String()) + "@example.test"
-	reg := postJSON(t, b.auth.URL+"/v1/auth/register", map[string]string{
+	reg := b.postJSON(t, b.auth.URL+"/v1/auth/register", map[string]string{
 		"client_id": b.clientID, "email": email, "password": "a-good-long-password",
 	})
 
-	status, _ := get(t, app.URL+"/whoami", jsonField(t, reg, "access_token"))
+	status, _ := a.get(t, app.URL+"/whoami", jsonField(t, reg, "access_token"))
 	if status != http.StatusUnauthorized {
 		t.Fatalf("app A accepted a token minted for app B: %d", status)
 	}
@@ -234,9 +227,7 @@ func TestSDKOAuthCallbackHandoff(t *testing.T) {
 
 	// 1. Start: the browser is sent to the provider.
 	startURL := e.sdk.StartURL("google", "https://app.test/cb", "my-state")
-	resp, err := (&http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
-		return http.ErrUseLastResponse
-	}}).Get(startURL)
+	resp, err := newIPClientNoRedirect(e.ip).Get(startURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,9 +238,7 @@ func TestSDKOAuthCallbackHandoff(t *testing.T) {
 
 	// 2. The provider redirects back to authsvc's callback, which issues a code.
 	q := url.Values{"state": {e.prov.state}, "code": {"provider-code"}}
-	resp2, err := (&http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
-		return http.ErrUseLastResponse
-	}}).Get(e.auth.URL + "/v1/oauth/google/callback?" + q.Encode())
+	resp2, err := newIPClientNoRedirect(e.ip).Get(e.auth.URL + "/v1/oauth/google/callback?" + q.Encode())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,7 +254,7 @@ func TestSDKOAuthCallbackHandoff(t *testing.T) {
 	}
 
 	// 3. The app's own callback exchanges it server-side.
-	status, body := get(t, cb.URL+"?code="+url.QueryEscape(code)+"&state=my-state", "")
+	status, body := e.get(t, cb.URL+"?code="+url.QueryEscape(code)+"&state=my-state", "")
 	if status != http.StatusOK {
 		t.Fatalf("SDK callback: %d %s", status, body)
 	}
@@ -279,7 +268,7 @@ func TestSDKOAuthCallbackHandoff(t *testing.T) {
 	// And the session it produced actually works.
 	app := e.protectedApp()
 	defer app.Close()
-	if s, b := get(t, app.URL+"/whoami", got.AccessToken); s != http.StatusOK {
+	if s, b := e.get(t, app.URL+"/whoami", got.AccessToken); s != http.StatusOK {
 		t.Fatalf("SDK-produced token rejected by the app: %d %s", s, b)
 	}
 }
@@ -292,13 +281,13 @@ func TestSDKCallbackSurfacesRefusedLink(t *testing.T) {
 		func(w http.ResponseWriter, r *http.Request, s *authsdk.Session) {
 			t.Error("session handler ran for a refused login")
 		},
-		func(w http.ResponseWriter, r *http.Request, code string, err error) {
-			gotCode = code
+		func(w http.ResponseWriter, r *http.Request, code authsdk.CallbackError, err error) {
+			gotCode = string(code)
 			w.WriteHeader(http.StatusUnauthorized)
 		}))
 	defer cb.Close()
 
-	get(t, cb.URL+"?error=manual_link_required&state=x", "")
+	e.get(t, cb.URL+"?error=manual_link_required&state=x", "")
 	if gotCode != "manual_link_required" {
 		t.Fatalf("error handler saw %q, want manual_link_required", gotCode)
 	}
@@ -309,7 +298,7 @@ func TestSDKRefreshRotates(t *testing.T) {
 	ctx := context.Background()
 
 	email := "user-" + strings.ToLower(ulid.Make().String()) + "@example.test"
-	reg := postJSON(t, e.auth.URL+"/v1/auth/register", map[string]string{
+	reg := e.postJSON(t, e.auth.URL+"/v1/auth/register", map[string]string{
 		"client_id": e.clientID, "email": email, "password": "a-good-long-password",
 	})
 	first := jsonField(t, reg, "refresh_token")
@@ -334,7 +323,7 @@ func TestSDKRefreshRotates(t *testing.T) {
 func TestSDKLogin(t *testing.T) {
 	e := setup(t)
 	email := "user-" + strings.ToLower(ulid.Make().String()) + "@example.test"
-	postJSON(t, e.auth.URL+"/v1/auth/register", map[string]string{
+	e.postJSON(t, e.auth.URL+"/v1/auth/register", map[string]string{
 		"client_id": e.clientID, "email": email, "password": "a-good-long-password",
 	})
 
@@ -359,26 +348,26 @@ func TestRevokedSessionStillVerifiesLocallyUntilExpiry(t *testing.T) {
 	defer app.Close()
 
 	email := "user-" + strings.ToLower(ulid.Make().String()) + "@example.test"
-	reg := postJSON(t, e.auth.URL+"/v1/auth/register", map[string]string{
+	reg := e.postJSON(t, e.auth.URL+"/v1/auth/register", map[string]string{
 		"client_id": e.clientID, "email": email, "password": "a-good-long-password",
 	})
 	access := jsonField(t, reg, "access_token")
 
 	req, _ := http.NewRequest("POST", e.auth.URL+"/v1/auth/logout", nil)
 	req.Header.Set("Authorization", "Bearer "+access)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := e.client.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
 	resp.Body.Close()
 
 	// authsvc itself refuses immediately.
-	if s, _ := get(t, e.auth.URL+"/v1/me", access); s != http.StatusUnauthorized {
+	if s, _ := e.get(t, e.auth.URL+"/v1/me", access); s != http.StatusUnauthorized {
 		t.Fatalf("authsvc still accepted a revoked session: %d", s)
 	}
 	// The SDK, verifying locally, does not know yet. Asserted so a future
 	// change to this behaviour is a deliberate decision rather than a surprise.
-	if s, _ := get(t, app.URL+"/whoami", access); s != http.StatusOK {
+	if s, _ := e.get(t, app.URL+"/whoami", access); s != http.StatusOK {
 		t.Fatalf("local verification changed behaviour: got %d", s)
 	}
 }

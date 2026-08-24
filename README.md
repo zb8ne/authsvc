@@ -69,6 +69,22 @@ mux.Handle("GET /auth/callback", auth.HandleCallback(
 on the request path**, so an authsvc outage cannot take down apps that depend on
 it — only login and refresh, which are interactive anyway, need the service up.
 
+Cached keys are trusted for at most `JWKSMaxStale` (default **7 days**) after
+refreshes start failing. That bounds how long a compromised signing key stays
+trusted by an app that cannot reach authsvc; without a bound, rotating a leaked
+key out would mean redeploying every dependent app. Past the limit the SDK fails
+closed with 503.
+
+### Failed sign-ins
+
+Pass `SignInURL` and the default callback handler renders a readable explanation
+instead of an error code. The one that matters is `manual_link_required` — a
+user who registered with a password and later clicks "Sign in with Google" hits
+it, and it tells them to sign in with their password and link from settings.
+Supply your own via `HandleCallbackWithError` to match your design;
+`CallbackError.Message()` gives you the wording, `Retryable()` says whether
+offering "try again" makes sense.
+
 ## How the OAuth handoff works
 
 The callback lands on `auth.zb8ne.lol` and cannot set a cookie for
@@ -89,6 +105,22 @@ The accepted cost: **role changes go stale for up to an hour**, and a revoked
 session keeps passing *local* SDK verification until the token expires. authsvc's
 own endpoints reject it immediately. For a permission that must revoke instantly,
 check it against your own database.
+
+### Revocation is asymmetric — know what `disabled_at` actually means
+
+authsvc's own `requireUser` checks that the session behind a token is still
+live, so logout, `disabled_at`, and reuse-detection take effect there
+**immediately**. The SDK verifies locally and does not, so a revoked user keeps
+working in consuming apps **for up to the access-token TTL — one hour**.
+
+Disabling a compromised account therefore kills authsvc access instantly and
+Dayflow access within the hour. That is the deliberate cost of offline
+verification: the alternative is a network call on every request, which
+reintroduces exactly the coupling the SDK exists to remove.
+
+If you need instant revocation for a specific action, check it against your own
+database at the point of use. `internal/e2e` pins this behaviour in a test so a
+future change is a decision, not a surprise.
 
 **Refresh** — not a JWT. 32 random bytes, stored only as sha256. httpOnly,
 Secure, SameSite=Lax, `Path=/v1/token`, 30-day TTL, rotated on every use.
@@ -144,8 +176,12 @@ app.
 **Rate limits** are per-IP and per-identifier on login, OTP request, and password
 reset. Fixed-window counters in Postgres; no Redis at this scale.
 
-**Pruning** runs in-process every 6h for expired sessions, codes, and rate-limit
-windows. `sessions` has `autovacuum_vacuum_scale_factor = 0.02` because every
+**Pruning** runs at startup and then every 6h, clearing sessions past
+`expires_at + 30d` plus expired codes, OAuth flows, and rate-limit windows. The
+startup run is deliberate: a platform that redeploys more often than the tick
+interval would otherwise never prune. `sessions` is the only table that grows
+with traffic rather than users — one row per refresh — so this is what stands
+between the service and unbounded storage growth. `sessions` has `autovacuum_vacuum_scale_factor = 0.02` because every
 refresh is an UPDATE plus an INSERT.
 
 Set a usage limit and alert on Railway.

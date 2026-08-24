@@ -55,7 +55,8 @@ func (k *keyCache) get() (jwk.Set, error) {
 		go k.refresh() // stale-while-revalidate
 	}
 	if max := k.c.cfg.JWKSMaxStale; max > 0 && age > max {
-		return nil, fmt.Errorf("authsdk: key set is %s stale, past JWKSMaxStale", age.Round(time.Second))
+		return nil, fmt.Errorf("%w: last refreshed %s ago, limit is %s",
+			ErrKeysTooStale, age.Round(time.Second), max)
 	}
 	return set, nil
 }
@@ -179,4 +180,9 @@ func (c *Client) getOnce(ctx context.Context, url string) ([]byte, error) {
 	return c.do(req)
 }
 
-func errorIsNoKeys(err error) bool { return errors.Is(err, ErrNoKeys) }
+// errorIsKeyProblem reports whether verification failed because the SDK has no
+// trustworthy keys, rather than because the token was bad. The distinction
+// drives 503-vs-401: neither case is the caller's fault.
+func errorIsKeyProblem(err error) bool {
+	return errors.Is(err, ErrNoKeys) || errors.Is(err, ErrKeysTooStale)
+}

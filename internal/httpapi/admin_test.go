@@ -7,7 +7,7 @@ import (
 
 	"github.com/oklog/ulid/v2"
 
-	"github.com/yash-sharma-dev/authsvc/internal/password"
+	"github.com/zb8ne/authsvc/internal/password"
 )
 
 func TestCreateClientReturnsSecretOnceAndStoresOnlyAHash(t *testing.T) {

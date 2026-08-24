@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yash-sharma-dev/authsvc/internal/linking"
-	"github.com/yash-sharma-dev/authsvc/internal/oauth"
-	"github.com/yash-sharma-dev/authsvc/internal/password"
-	"github.com/yash-sharma-dev/authsvc/internal/store"
+	"github.com/zb8ne/authsvc/internal/linking"
+	"github.com/zb8ne/authsvc/internal/oauth"
+	"github.com/zb8ne/authsvc/internal/password"
+	"github.com/zb8ne/authsvc/internal/store"
 )
 
 // handleOAuthStart begins a login. The originating app is recorded server-side

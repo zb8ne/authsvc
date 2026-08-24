@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/yash-sharma-dev/authsvc/internal/notify"
-	"github.com/yash-sharma-dev/authsvc/internal/store"
+	"github.com/zb8ne/authsvc/internal/notify"
+	"github.com/zb8ne/authsvc/internal/store"
 )
 
 func TestOTPLoginCreatesAndVerifiesAccount(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yash-sharma-dev/authsvc/internal/notify"
+	"github.com/zb8ne/authsvc/internal/notify"
 )
 
 func TestRegisterIssuesTokensAndSendsVerification(t *testing.T) {

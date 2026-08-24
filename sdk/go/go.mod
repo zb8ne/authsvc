@@ -1,4 +1,4 @@
-module github.com/yash-sharma-dev/authsvc/sdk/go
+module github.com/zb8ne/authsvc/sdk/go
 
 go 1.26.4
 

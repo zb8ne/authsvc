@@ -7,7 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/oklog/ulid/v2"
 
-	"github.com/yash-sharma-dev/authsvc/internal/token"
+	"github.com/zb8ne/authsvc/internal/token"
 )
 
 // RefreshTTL is how long a refresh token stays valid before the user must log

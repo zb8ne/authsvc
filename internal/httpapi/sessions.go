@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/yash-sharma-dev/authsvc/internal/store"
+	"github.com/zb8ne/authsvc/internal/store"
 )
 
 func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {

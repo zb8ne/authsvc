@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/yash-sharma-dev/authsvc/internal/notify"
-	"github.com/yash-sharma-dev/authsvc/internal/oauth"
-	"github.com/yash-sharma-dev/authsvc/internal/store"
-	"github.com/yash-sharma-dev/authsvc/internal/token"
+	"github.com/zb8ne/authsvc/internal/notify"
+	"github.com/zb8ne/authsvc/internal/oauth"
+	"github.com/zb8ne/authsvc/internal/store"
+	"github.com/zb8ne/authsvc/internal/token"
 )
 
 // Cookie settings. Path is /v1/token so the refresh token is sent only to the

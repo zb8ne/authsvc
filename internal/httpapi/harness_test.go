@@ -20,10 +20,10 @@ import (
 
 	"github.com/oklog/ulid/v2"
 
-	"github.com/yash-sharma-dev/authsvc/internal/notify"
-	"github.com/yash-sharma-dev/authsvc/internal/password"
-	"github.com/yash-sharma-dev/authsvc/internal/store"
-	"github.com/yash-sharma-dev/authsvc/internal/token"
+	"github.com/zb8ne/authsvc/internal/notify"
+	"github.com/zb8ne/authsvc/internal/password"
+	"github.com/zb8ne/authsvc/internal/store"
+	"github.com/zb8ne/authsvc/internal/token"
 )
 
 // capture records every code the service tries to deliver, so tests can read

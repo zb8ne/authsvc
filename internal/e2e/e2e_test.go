@@ -20,12 +20,12 @@ import (
 
 	"github.com/oklog/ulid/v2"
 
-	"github.com/yash-sharma-dev/authsvc/internal/httpapi"
-	"github.com/yash-sharma-dev/authsvc/internal/notify"
-	"github.com/yash-sharma-dev/authsvc/internal/oauth"
-	"github.com/yash-sharma-dev/authsvc/internal/store"
-	"github.com/yash-sharma-dev/authsvc/internal/token"
-	authsdk "github.com/yash-sharma-dev/authsvc/sdk/go"
+	"github.com/zb8ne/authsvc/internal/httpapi"
+	"github.com/zb8ne/authsvc/internal/notify"
+	"github.com/zb8ne/authsvc/internal/oauth"
+	"github.com/zb8ne/authsvc/internal/store"
+	"github.com/zb8ne/authsvc/internal/token"
+	authsdk "github.com/zb8ne/authsvc/sdk/go"
 )
 
 type nullSender struct{}

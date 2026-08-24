@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/yash-sharma-dev/authsvc/internal/notify"
-	"github.com/yash-sharma-dev/authsvc/internal/password"
-	"github.com/yash-sharma-dev/authsvc/internal/store"
+	"github.com/zb8ne/authsvc/internal/notify"
+	"github.com/zb8ne/authsvc/internal/password"
+	"github.com/zb8ne/authsvc/internal/store"
 )
 
 // dummyHash is verified against when no user exists, so a login attempt costs

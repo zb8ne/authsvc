@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yash-sharma-dev/authsvc/internal/store"
-	"github.com/yash-sharma-dev/authsvc/internal/token"
+	"github.com/zb8ne/authsvc/internal/store"
+	"github.com/zb8ne/authsvc/internal/token"
 )
 
 type ctxKey int

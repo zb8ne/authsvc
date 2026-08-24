@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/yash-sharma-dev/authsvc/internal/notify"
-	"github.com/yash-sharma-dev/authsvc/internal/store"
+	"github.com/zb8ne/authsvc/internal/notify"
+	"github.com/zb8ne/authsvc/internal/store"
 )
 
 // otpIdentifier scopes a code to one client. A code issued for "dayflow" must

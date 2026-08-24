@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/yash-sharma-dev/authsvc/internal/password"
-	"github.com/yash-sharma-dev/authsvc/internal/store"
+	"github.com/zb8ne/authsvc/internal/password"
+	"github.com/zb8ne/authsvc/internal/store"
 )
 
 type createClientReq struct {

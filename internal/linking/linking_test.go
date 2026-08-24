@@ -9,8 +9,8 @@ import (
 
 	"github.com/oklog/ulid/v2"
 
-	"github.com/yash-sharma-dev/authsvc/internal/oauth"
-	"github.com/yash-sharma-dev/authsvc/internal/store"
+	"github.com/zb8ne/authsvc/internal/oauth"
+	"github.com/zb8ne/authsvc/internal/store"
 )
 
 func testDB(t *testing.T) *store.DB {

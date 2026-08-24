@@ -16,7 +16,7 @@ import (
 )
 
 type Config struct {
-	// BaseURL is the authsvc origin, e.g. https://auth.zb8ne.lol.
+	// BaseURL is the authsvc origin, e.g. https://auth.grindlog.lol.
 	BaseURL string
 	// FallbackURL is tried when BaseURL fails to connect or returns 5xx.
 	FallbackURL string

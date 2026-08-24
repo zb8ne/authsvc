@@ -4,7 +4,7 @@ Standalone authentication service. Deployed once at a fixed domain; every future
 project consumes it through a small Go SDK.
 
 Google and GitHub OAuth apps are registered **once**, against one callback URL
-(`https://auth.zb8ne.lol/v1/oauth/{provider}/callback`). Onboarding a new app is
+(`https://auth.grindlog.lol/v1/oauth/{provider}/callback`). Onboarding a new app is
 then: create a client row, put the secret in env, three lines of SDK. No console
 work.
 
@@ -25,7 +25,7 @@ docker compose up --build
 ## Onboarding a new app
 
 ```sh
-curl -X POST https://auth.zb8ne.lol/v1/admin/clients \
+curl -X POST https://auth.grindlog.lol/v1/admin/clients \
   -H "Authorization: Bearer $ADMIN_API_KEY" \
   -d '{"id":"dayflow","name":"Dayflow","redirect_uris":["https://dayflow.vercel.app/auth/callback"]}'
 ```
@@ -41,8 +41,8 @@ callback. Loose matching here is an open redirect that hands over the auth code.
 
 ```go
 auth, _ := authsdk.New(authsdk.Config{
-    BaseURL:      "https://auth.zb8ne.lol",
-    FallbackURL:  "https://auth-standby.zb8ne.lol",
+    BaseURL:      "https://auth.grindlog.lol",
+    FallbackURL:  "https://auth-standby.grindlog.lol",
     ClientID:     "dayflow",
     ClientSecret: os.Getenv("AUTH_CLIENT_SECRET"),
     Audience:     "dayflow",
@@ -87,14 +87,14 @@ offering "try again" makes sense.
 
 ## How the OAuth handoff works
 
-The callback lands on `auth.zb8ne.lol` and cannot set a cookie for
+The callback lands on `auth.grindlog.lol` and cannot set a cookie for
 `someapp.vercel.app`. So:
 
 1. the callback issues a one-time `auth_code` (60s TTL)
 2. it redirects to the app's registered `redirect_uri?code=...`
 3. the app's **backend** calls `/v1/token/exchange` and sets its own cookie
 
-A `Domain=.zb8ne.lol` cookie would break on Vercel preview URLs, which is exactly
+A `Domain=.grindlog.lol` cookie would break on Vercel preview URLs, which is exactly
 where hackathon demos live. `HandleCallback` does steps 2–3 for you.
 
 ## Tokens

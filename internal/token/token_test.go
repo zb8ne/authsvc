@@ -20,7 +20,7 @@ func newKeyB64(t *testing.T) string {
 func newSigner(t *testing.T) *Signer {
 	t.Helper()
 	s, err := NewSigner(Config{
-		Issuer:     "https://auth.zb8ne.lol",
+		Issuer:     "https://auth.grindlog.lol",
 		AccessTTL:  time.Hour,
 		PrivateKey: newKeyB64(t),
 		NextKey:    newKeyB64(t),
@@ -100,7 +100,7 @@ func TestVerifyRejectsNoneAlg(t *testing.T) {
 	// header {"alg":"none","typ":"JWT"} + a payload, empty signature
 	e := base64.RawURLEncoding.EncodeToString
 	forged := e([]byte(`{"alg":"none","typ":"JWT"}`)) + "." +
-		e([]byte(`{"iss":"https://auth.zb8ne.lol","sub":"u1","aud":"dayflow","exp":99999999999}`)) + "."
+		e([]byte(`{"iss":"https://auth.grindlog.lol","sub":"u1","aud":"dayflow","exp":99999999999}`)) + "."
 	if _, err := s.VerifyAccess(forged, "dayflow"); err == nil {
 		t.Fatal("alg=none token verified")
 	}

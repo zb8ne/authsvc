@@ -156,6 +156,25 @@ account takeover. Every combination of {provider verified, unverified} × {user
 exists verified, exists unverified, doesn't exist} × {already linked, not} is
 covered by a table-driven test.
 
+## OAuth apps (registered once, never again)
+
+Both are registered against the single fixed callback on `auth.grindlog.lol`.
+Onboarding a new consuming app never touches these consoles.
+
+| Provider | Where | Callback |
+|---|---|---|
+| Google | GCP project `grindlog-auth` (yashbonzer.work@gmail.com) | `https://auth.grindlog.lol/v1/oauth/google/callback` |
+| GitHub | OAuth App "grindlog auth" (owner `zb8ne`) | `https://auth.grindlog.lol/v1/oauth/github/callback` |
+
+**Google is in testing mode.** Only accounts listed under Google Auth Platform →
+Audience → Test users can sign in (cap 100). To publish, the Branding page needs
+an app homepage, a privacy policy URL, and a terms-of-service URL on
+`grindlog.lol`; with only `openid`/`email`/`profile` scopes no Google review is
+required, so it is one click once those pages exist. **Until then, a Google
+login from any other account fails** — that is configuration, not a bug.
+
+GitHub has no such restriction and works for anyone immediately.
+
 ## Ops
 
 **Migrations run as a release command, not on boot** — a bad migration should

@@ -1,9 +1,11 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/zb8ne/authsvc/internal/notify"
 )
@@ -24,7 +26,9 @@ func TestRegisterIssuesTokensAndSendsVerification(t *testing.T) {
 		t.Fatal("refresh cookie not set")
 	}
 
-	sent, ok := r.mail.last(notify.PurposeEmailVerify)
+	// The send is deliberately off the request path, so poll rather than
+	// assume it has already happened.
+	sent, ok := r.mail.waitFor(notify.PurposeEmailVerify, 5*time.Second)
 	if !ok {
 		t.Fatal("no verification email sent")
 	}
@@ -154,7 +158,7 @@ func TestEmailVerifyFlow(t *testing.T) {
 	email := r.email()
 	reg := r.register(cid, email, goodPassword)
 
-	sent, ok := r.mail.last(notify.PurposeEmailVerify)
+	sent, ok := r.mail.waitFor(notify.PurposeEmailVerify, 5*time.Second)
 	if !ok {
 		t.Fatal("no verification token sent")
 	}
@@ -274,4 +278,55 @@ func TestMalformedBodyRejected(t *testing.T) {
 	if rp.Status != http.StatusBadRequest {
 		t.Fatalf("unknown field accepted: %d %s", rp.Status, rp.Raw)
 	}
+}
+
+// hangingSender never returns. It stands in for a mail provider behind a
+// blocked port — exactly the Railway failure that made registration hang.
+type hangingSender struct{ release chan struct{} }
+
+func (h hangingSender) SendCode(ctx context.Context, to notify.Address, p notify.Purpose, code string) error {
+	select {
+	case <-h.release:
+	case <-ctx.Done():
+	}
+	return ctx.Err()
+}
+
+// Registration must not wait on mail delivery.
+func TestRegisterDoesNotBlockOnAHungMailProvider(t *testing.T) {
+	r := newRig(t)
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	r.server.sender = hangingSender{release: release}
+
+	done := make(chan reply, 1)
+	go func() { done <- r.register(r.newClient(), r.email(), goodPassword) }()
+
+	select {
+	case rp := <-done:
+		if rp.Status != http.StatusCreated {
+			t.Fatalf("status %d: %s", rp.Status, rp.Raw)
+		}
+		if rp.str("access_token") == "" {
+			t.Fatal("no tokens returned")
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("registration blocked on the mail provider; the verification email must be sent in the background")
+	}
+}
+
+// The email still gets sent, just not on the request path.
+func TestVerificationEmailIsStillDelivered(t *testing.T) {
+	r := newRig(t)
+	email := r.email()
+	r.register(r.newClient(), email, goodPassword)
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if sent, ok := r.mail.last(notify.PurposeEmailVerify); ok && sent.To == email {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatal("verification email was never delivered in the background")
 }

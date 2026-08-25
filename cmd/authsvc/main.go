@@ -128,7 +128,16 @@ func providers(cfg *config.Config, log *slog.Logger) []oauth.Provider {
 }
 
 func buildSender(cfg *config.Config, log *slog.Logger) (notify.Sender, error) {
+	// Prefer the HTTPS API. Railway and most other PaaS providers block
+	// outbound SMTP ports, so an SMTP sender that works locally will hang in
+	// production; port 443 is never blocked.
+	if cfg.ResendAPIKey != "" && cfg.MailFrom != "" {
+		log.Info("mail: using Resend HTTPS API", "from", cfg.MailFrom)
+		return notify.ResendSender{APIKey: cfg.ResendAPIKey, From: cfg.MailFrom}, nil
+	}
 	if cfg.SMTP.Configured() {
+		log.Warn("mail: using SMTP; if sends hang in production your host likely blocks outbound SMTP ports — set RESEND_API_KEY instead",
+			"host", cfg.SMTP.Host, "port", cfg.SMTP.Port)
 		return notify.SMTPSender{
 			Host: cfg.SMTP.Host, Port: cfg.SMTP.Port,
 			User: cfg.SMTP.User, Pass: cfg.SMTP.Pass, From: cfg.SMTP.From,
@@ -138,7 +147,7 @@ func buildSender(cfg *config.Config, log *slog.Logger) (notify.Sender, error) {
 		log.Warn("SMTP not configured; codes will be logged, not emailed")
 		return notify.LogSender{Log: log}, nil
 	}
-	return nil, errors.New("SMTP_HOST and SMTP_FROM are required outside DEV")
+	return nil, errors.New("no mail transport configured: set RESEND_API_KEY + MAIL_FROM (preferred), or SMTP_HOST + SMTP_FROM")
 }
 
 // prune keeps the tables that grow from accumulating dead rows. sessions is the

@@ -173,6 +173,17 @@ one — no flag day.
 **Backups.** `pg_dump` on cron to R2/B2. This DB holds every account for every
 app.
 
+**Mail transport.** Prefer `RESEND_API_KEY` + `MAIL_FROM` over SMTP. Railway —
+like most PaaS providers — **blocks outbound SMTP ports (25/465/587)** to
+prevent spam abuse, so an SMTP sender that works on your laptop will hang in
+production. The HTTPS API uses port 443, which is never blocked. SMTP sends are
+bounded by `DefaultSMTPTimeout` (20s) because `net/smtp` has no timeout of its
+own and will otherwise block until the OS gives up.
+
+The verification email at registration is sent **in the background**: a slow
+provider must not stall signup. OTP and password-reset sends stay inline,
+because there the user is waiting on the code itself.
+
 **Rate limits** are per-IP and per-identifier on login, OTP request, and password
 reset. Fixed-window counters in Postgres; no Redis at this scale.
 
@@ -196,7 +207,8 @@ ED25519_PRIVATE_KEY          # + ED25519_PRIVATE_KEY_NEXT for rotation
 ACCESS_TTL                   # default 1h
 GOOGLE_CLIENT_ID / _SECRET   # provider 404s if unset
 GITHUB_CLIENT_ID / _SECRET
-SMTP_HOST / _PORT / _USER / _PASS / _FROM
+RESEND_API_KEY + MAIL_FROM      # preferred: HTTPS, works everywhere
+SMTP_HOST / _PORT / _USER / _PASS / _FROM   # fallback
 ADMIN_API_KEY
 DEV                          # relaxes cookie Secure; logs codes instead of emailing
 ```

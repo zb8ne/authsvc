@@ -253,10 +253,28 @@ func (s *Server) handlePasswordReset(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]bool{"password_reset": true})
 }
 
+// sendEmailVerification delivers the verification link in the background.
+//
+// It must not run inline: the user does not need the email to have been
+// accepted by the provider before their account exists, and a slow or
+// unreachable mail provider would otherwise stall — or hang — registration.
+// Delivery failures are logged, not surfaced.
 func (s *Server) sendEmailVerification(ctx context.Context, u *store.User) {
 	if u.EmailVerified() {
 		return
 	}
+
+	// Detach from the request context, which is cancelled the moment the
+	// response is written, but keep a hard ceiling of our own.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+
+	go func() {
+		defer cancel()
+		s.deliverEmailVerification(ctx, u)
+	}()
+}
+
+func (s *Server) deliverEmailVerification(ctx context.Context, u *store.User) {
 	tok, err := store.NewOpaqueToken()
 	if err != nil {
 		s.log.ErrorContext(ctx, "mint verify token", "err", err)
@@ -267,7 +285,7 @@ func (s *Server) sendEmailVerification(ctx context.Context, u *store.User) {
 		return
 	}
 	if err := s.sender.SendCode(ctx, notify.Email(u.Email), notify.PurposeEmailVerify, tok); err != nil {
-		s.log.ErrorContext(ctx, "send verify email", "err", err)
+		s.log.ErrorContext(ctx, "send verify email", "err", err, "user_id", u.ID)
 	}
 }
 

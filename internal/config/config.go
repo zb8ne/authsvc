@@ -28,6 +28,11 @@ type Config struct {
 	GitHub OAuthApp
 
 	SMTP SMTP
+	// ResendAPIKey selects the HTTPS-based sender. Preferred over SMTP: most
+	// PaaS providers block outbound SMTP ports.
+	ResendAPIKey string
+	// MailFrom is the envelope sender for whichever transport is used.
+	MailFrom string
 
 	AdminAPIKey string
 
@@ -52,6 +57,11 @@ type SMTP struct {
 
 func (s SMTP) Configured() bool { return s.Host != "" && s.From != "" }
 
+// MailConfigured reports whether any transport is usable.
+func (c *Config) MailConfigured() bool {
+	return (c.ResendAPIKey != "" && c.MailFrom != "") || c.SMTP.Configured()
+}
+
 // Load reads the environment and fails fast on anything missing that the
 // service cannot start without.
 func Load() (*Config, error) {
@@ -72,6 +82,9 @@ func Load() (*Config, error) {
 			Pass: os.Getenv("SMTP_PASS"),
 			From: os.Getenv("SMTP_FROM"),
 		},
+
+		ResendAPIKey: os.Getenv("RESEND_API_KEY"),
+		MailFrom:     os.Getenv("MAIL_FROM"),
 
 		AdminAPIKey: os.Getenv("ADMIN_API_KEY"),
 		Dev:         env("DEV", "") != "",
@@ -106,6 +119,11 @@ func Load() (*Config, error) {
 	if len(missing) > 0 {
 		return nil, fmt.Errorf("config: missing required env: %s", strings.Join(missing, ", "))
 	}
+	// MAIL_FROM falls back to SMTP_FROM so existing configs keep working.
+	if c.MailFrom == "" {
+		c.MailFrom = c.SMTP.From
+	}
+
 	if !c.Dev && !strings.HasPrefix(c.Issuer, "https://") {
 		return nil, errors.New("config: ISSUER must be https outside DEV")
 	}

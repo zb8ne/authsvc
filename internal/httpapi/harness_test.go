@@ -50,6 +50,22 @@ func (c *capture) SendCode(ctx context.Context, to notify.Address, p notify.Purp
 	return nil
 }
 
+// waitFor polls for a code of the given purpose. Sends that happen off the
+// request path (email verification) are not visible the instant a handler
+// returns, so tests must wait rather than assume.
+func (c *capture) waitFor(p notify.Purpose, d time.Duration) (sentCode, bool) {
+	deadline := time.Now().Add(d)
+	for {
+		if sc, ok := c.last(p); ok {
+			return sc, true
+		}
+		if time.Now().After(deadline) {
+			return sentCode{}, false
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
 func (c *capture) last(p notify.Purpose) (sentCode, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

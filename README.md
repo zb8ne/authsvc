@@ -39,6 +39,17 @@ callback. Loose matching here is an open redirect that hands over the auth code.
 
 ## Using it from an app
 
+Go and Rust SDKs live in `sdk/go` and `sdk/rust`. Both verify locally against a
+cached JWKS and make no network call on the request path.
+
+```sh
+go get github.com/zb8ne/authsvc/sdk/go@v0.1.0
+```
+```toml
+authsdk = { git = "https://github.com/zb8ne/authsvc", tag = "sdk/rust/v0.1.0" }
+```
+
+
 ```go
 auth, _ := authsdk.New(authsdk.Config{
     BaseURL:      "https://auth.grindlog.lol",
@@ -174,6 +185,18 @@ required, so it is one click once those pages exist. **Until then, a Google
 login from any other account fails** — that is configuration, not a bug.
 
 GitHub has no such restriction and works for anyone immediately.
+
+## Secrets
+
+Production secrets live in Doppler (project `authsvc`, config `prd`), not in a
+file. Run anything with them injected:
+
+```sh
+doppler run --project authsvc --config prd -- ./authsvc
+```
+
+`DATABASE_URL` is deliberately NOT in Doppler — Railway injects it from the
+Postgres plugin as `${{Postgres.DATABASE_URL}}`, so it differs per environment.
 
 ## Ops
 

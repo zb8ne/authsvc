@@ -88,3 +88,47 @@ func TestAccessTokenIsBoundToItsAudience(t *testing.T) {
 		t.Fatal("the token verified against a different client's audience")
 	}
 }
+
+// Google requires these before an OAuth app can be published, and users see
+// them on the consent screen. A 404 here blocks publishing.
+func TestLegalPagesAreServed(t *testing.T) {
+	r := newRig(t)
+	for _, path := range []string{"/", "/privacy", "/terms"} {
+		rp := r.do("GET", path, nil)
+		if rp.Status != http.StatusOK {
+			t.Errorf("%s returned %d, want 200", path, rp.Status)
+		}
+		if ct := rp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+			t.Errorf("%s Content-Type = %q", path, ct)
+		}
+		if len(rp.Raw) < 400 {
+			t.Errorf("%s body is only %d bytes; too thin to be a real page", path, len(rp.Raw))
+		}
+	}
+}
+
+// The privacy page must actually describe what the service stores. If this
+// drifts from reality it is worse than having no page.
+func TestPrivacyPageDescribesWhatIsActuallyStored(t *testing.T) {
+	r := newRig(t)
+	body := strings.ToLower(string(r.do("GET", "/privacy", nil).Raw))
+
+	for _, want := range []string{"email", "argon2id", "ip address", "user-agent", "session"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("privacy page does not mention %q, which the service does store", want)
+		}
+	}
+	for _, want := range []string{"resend", "railway"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("privacy page does not disclose the %q subprocessor", want)
+		}
+	}
+}
+
+// An unknown path must still 404 — the root handler must not swallow everything.
+func TestRootHandlerDoesNotSwallowUnknownPaths(t *testing.T) {
+	r := newRig(t)
+	if rp := r.do("GET", "/definitely-not-a-route", nil); rp.Status != http.StatusNotFound {
+		t.Fatalf("unknown path returned %d, want 404", rp.Status)
+	}
+}

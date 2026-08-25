@@ -32,6 +32,9 @@ type Options struct {
 	AdminAPIKey string
 	// Secure controls the cookie Secure flag; false only for local development.
 	Secure bool
+	// ContactEmail is shown on the privacy and terms pages. Google requires a
+	// reachable contact for a published OAuth app.
+	ContactEmail string
 }
 
 type Server struct {
@@ -58,6 +61,9 @@ func New(db *store.DB, signer *token.Signer, sender notify.Sender, log *slog.Log
 	if log == nil {
 		log = slog.Default()
 	}
+	if opts.ContactEmail == "" {
+		opts.ContactEmail = "See the repository at github.com/zb8ne/authsvc"
+	}
 	return &Server{db: db, signer: signer, sender: sender, log: log, opts: opts,
 		now: time.Now, providers: map[string]oauth.Provider{}}
 }
@@ -67,6 +73,12 @@ func (s *Server) Routes() http.Handler {
 
 	mux.HandleFunc("GET /.well-known/jwks.json", s.handleJWKS)
 	mux.HandleFunc("GET /healthz", s.handleHealth)
+
+	// Required by Google before an OAuth app can be published, and shown to
+	// users on the consent screen.
+	mux.HandleFunc("GET /", s.handleHome)
+	mux.HandleFunc("GET /privacy", s.handlePrivacy)
+	mux.HandleFunc("GET /terms", s.handleTerms)
 
 	mux.HandleFunc("POST /v1/auth/register", s.handleRegister)
 	mux.HandleFunc("POST /v1/auth/login", s.handleLogin)

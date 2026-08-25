@@ -73,9 +73,10 @@ func run(log *slog.Logger, migrateOnly bool) error {
 	}
 
 	srv := httpapi.New(db, signer, sender, log, httpapi.Options{
-		Issuer:      cfg.Issuer,
-		AdminAPIKey: cfg.AdminAPIKey,
-		Secure:      !cfg.Dev,
+		Issuer:       cfg.Issuer,
+		AdminAPIKey:  cfg.AdminAPIKey,
+		Secure:       !cfg.Dev,
+		ContactEmail: cfg.ContactEmail,
 	}).WithProviders(providers(cfg, log)...)
 
 	go prune(ctx, db, log)

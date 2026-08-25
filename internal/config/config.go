@@ -35,6 +35,8 @@ type Config struct {
 	MailFrom string
 
 	AdminAPIKey string
+	// ContactEmail appears on the privacy and terms pages.
+	ContactEmail string
 
 	// Dev relaxes cookie Secure and lets notify fall back to stdout.
 	Dev bool
@@ -86,8 +88,9 @@ func Load() (*Config, error) {
 		ResendAPIKey: os.Getenv("RESEND_API_KEY"),
 		MailFrom:     os.Getenv("MAIL_FROM"),
 
-		AdminAPIKey: os.Getenv("ADMIN_API_KEY"),
-		Dev:         env("DEV", "") != "",
+		AdminAPIKey:  os.Getenv("ADMIN_API_KEY"),
+		ContactEmail: os.Getenv("CONTACT_EMAIL"),
+		Dev:          env("DEV", "") != "",
 	}
 
 	ttl, err := time.ParseDuration(env("ACCESS_TTL", "1h"))

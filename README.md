@@ -177,14 +177,16 @@ Onboarding a new consuming app never touches these consoles.
 | Google | GCP project `grindlog-auth` (yashbonzer.work@gmail.com) | `https://auth.grindlog.lol/v1/oauth/google/callback` |
 | GitHub | OAuth App "grindlog auth" (owner `zb8ne`) | `https://auth.grindlog.lol/v1/oauth/github/callback` |
 
-**Google is in testing mode.** Only accounts listed under Google Auth Platform →
-Audience → Test users can sign in (cap 100). To publish, the Branding page needs
-an app homepage, a privacy policy URL, and a terms-of-service URL on
-`grindlog.lol`; with only `openid`/`email`/`profile` scopes no Google review is
-required, so it is one click once those pages exist. **Until then, a Google
-login from any other account fails** — that is configuration, not a bug.
+**Both are published and work for anyone.** Google was pushed to production on
+2026-08-26; no verification review was required because the app uses only
+`openid`/`email`/`profile`, has one authorized domain, and has no logo. Adding a
+logo, an 11th domain, or a sensitive scope would trigger a review — so do not add
+a logo casually.
 
-GitHub has no such restriction and works for anyone immediately.
+The consent screen links to `/`, `/privacy`, and `/terms`, which this service
+serves itself (see `internal/httpapi/legal.go`). **If you change what data is
+collected, update the privacy page** — a test asserts it mentions what is
+actually stored, so CI fails if the two drift apart.
 
 ## Secrets
 
